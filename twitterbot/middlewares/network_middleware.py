@@ -2,7 +2,11 @@ from dataclasses import dataclass, field
 from typing import ClassVar
 from urllib.parse import urlencode
 import requests
+import atexit
 from loguru import logger
+import datetime
+import os
+import json
 
 
 @dataclass
@@ -11,6 +15,19 @@ class NetworkMiddleware:
     __next_cursor: str = field(default="", init=False, repr=False)
     query: str = ""
     lang: str = None
+    __started_at: str = field(default=None, init=False, repr=False)
+
+    def __post_init__(self):
+        atexit.register(self.save_data)
+        home = os.path.expanduser("~")
+        backup_dir = os.path.join(home, ".twitter-bot")
+        if os.path.isdir(backup_dir):
+            cache_path = os.path.join(backup_dir, "cache.json")
+            if os.path.isfile(cache_path):
+                with open(cache_path, "r") as f:
+                    data = json.load(f)
+                    last_cache = data[-1]
+                    self.__next_cursor = last_cache["stopped_at"]
 
     @property
     def new_tweets(self):
@@ -40,7 +57,38 @@ class NetworkMiddleware:
                 self.__next_cursor = ""
                 return req.status_code, None
             else:
+                if self.__started_at is None:
+                    self.__started_at = data["min_position"]
                 self.__next_cursor = data["min_position"]
+                logger.debug(f"Cursor Begin From: {self.__started_at}")
+                logger.debug(f"Current cursor : {self.__next_cursor}")
+
                 return req.status_code, data["items_html"]
         else:
             return req.status_code, None
+
+    def save_data(self):
+        home = os.path.expanduser("~")
+        backup_dir = os.path.join(home, ".twitter-bot")
+        os.makedirs(backup_dir, exist_ok=True)
+        with open(os.path.join(backup_dir, "cache.json"), "w+") as f:
+            data = f.read()
+            if not data:
+                data_to_be_saved = [
+                    {
+                        "last_started_at": self.__started_at,
+                        "stopped_at": self.__next_cursor,
+                        "date": datetime.datetime.now().timestamp(),
+                    }
+                ]
+
+            else:
+                data_to_be_saved = json.loads(data)
+                data_to_be_saved.append(
+                    {
+                        "last_started_at": self.__started_at,
+                        "stopped_at": self.__next_cursor,
+                        "date": datetime.datetime.now().timestamp(),
+                    }
+                )
+            json.dump(data_to_be_saved, f)

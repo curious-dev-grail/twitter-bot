@@ -130,3 +130,6 @@ dmypy.json
 
 # IDE Configuration
 **/.idea
+
+# Sonnar Scanner
+**/.scannerwork
