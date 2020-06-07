@@ -79,9 +79,9 @@ class TwitterBot:
             )
             os.makedirs(base_path, exist_ok=True)
         if (
-                filename
-                and filename.strip()
-                and os.path.exists(os.path.join(os.path.join(base_path, filename)))
+            filename
+            and filename.strip()
+            and os.path.exists(os.path.join(os.path.join(base_path, filename)))
         ):
             choice = input("File Exists, Do You want to override(y/N):")
             if choice.strip() != "y" or choice.strip() != "Y":
@@ -99,7 +99,9 @@ class TwitterBot:
         if self.__failure > 20:
             self.__failure = 0
             logger.error("Maximum Attempts of Failure Shutting down Bot")
-            raise exceptions.MaximumRetryException("Too many failure attempts to scrape tweets")
+            raise exceptions.MaximumRetryException(
+                "Too many failure attempts to scrape tweets"
+            )
         if 10 <= self.__failure < 20:
             wait_time = random.choice(20, 120)
             self.__failure += 1
