@@ -53,11 +53,14 @@ class TwitterBot:
             while True:
                 status, tweets = network.new_tweets
                 if status == 200:
+                    self.__failure = 0
                     if tweets:
                         tweet = TweetsParser(tweets)
                         all_tweets.extend(tweet.parsed_tweets)
                     else:
                         break
+                    logger.info(f"Scrapped Tweets: {len(all_tweets)}")
+                    time.sleep(random.randint(5, 10))
                 else:
                     self.sleep()
         except exceptions.TwitterBotException as e:
@@ -94,12 +97,15 @@ class TwitterBot:
 
     def sleep(self):
         if self.__failure > 20:
+            self.__failure = 0
             logger.error("Maximum Attempts of Failure Shutting down Bot")
             raise exceptions.MaximumRetryException("Too many failure attempts to scrape tweets")
         if 10 <= self.__failure < 20:
             wait_time = random.choice(20, 120)
+            self.__failure += 1
             logger.info(f"Failure Occur, Waiting for {wait_time}")
         else:
             wait_time = random.choice(5, 20)
+            self.__failure += 1
             logger.info(f"Failure Occur, Waiting for {wait_time}")
         time.sleep(wait_time)
