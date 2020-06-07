@@ -67,6 +67,7 @@ class TwitterBot:
 
     def save_all_tweet_to_json(self, filename="", path=""):
         all_tweets = self.get_all_tweets()
+        logger.info(f"Scrapped Tweets:{len(all_tweets)}")
         if path.strip() and not os.path.exists(os.path.abspath(path)):
             base_path = os.path.abspath(path)
         else:
