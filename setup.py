@@ -7,10 +7,10 @@ with open(
     dependencies = f.read().split("\n")
 
 setup(
-    name="Twitter Bot",
+    name="twitter-bot",
     author="Gaurav",
     description="A Tool to Scrape Tweets",
-    version="0.1",
+    version="0.2",
     packages=find_packages(),
     py_modules=["twitterbot.cli", "twitterbot.twitterbot", "twitterbot.exceptions"],
     install_requires=dependencies,

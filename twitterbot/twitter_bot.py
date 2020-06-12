@@ -19,6 +19,7 @@ class TwitterBot:
     until: str = None
     query_search: str = None
     lang: str = None
+    fetch_new: bool = field(default=False)
     __failure: int = field(default=0, init=False, repr=False)
 
     def get_tweets(self):
@@ -39,10 +40,13 @@ class TwitterBot:
                     else:
                         logger.info("Tweets Finished")
                         return
-                    sleeping_time = random.randint(5, 10)
+                    sleeping_time = random.uniform(5, 15)
                     logger.debug(f"Sleeping For {sleeping_time} seconds")
                     time.sleep(sleeping_time)
+                elif status == 204:
+                    return
                 else:
+                    self.__failure += 1
                     self.sleep()
         except exceptions.TwitterBotException as e:
             logger.error(e)
@@ -58,7 +62,9 @@ class TwitterBot:
             until=self.until,
             query_search=self.query_search,
         ).query
-        network = NetworkMiddleware(query=query, lang=self.lang)
+        network = NetworkMiddleware(
+            query=query, lang=self.lang, fetch_new=self.fetch_new
+        )
         all_tweets: List[Tweet] = list()
         try:
             while True:
@@ -69,12 +75,16 @@ class TwitterBot:
                         tweet = TweetsParser(tweets)
                         all_tweets.extend(tweet.parsed_tweets)
                     else:
-                        break
+                        self.__failure += 1
+                        self.sleep()
                     logger.info(f"Scrapped Tweets: {len(all_tweets)}")
-                    sleeping_time = random.randint(5, 10)
+                    sleeping_time = random.uniform(5, 15)
                     logger.debug(f"Sleeping For: {sleeping_time} seconds")
                     time.sleep(sleeping_time)
+                elif status == 204:
+                    break
                 else:
+                    self.__failure += 1
                     self.sleep()
         except exceptions.TwitterBotException as e:
             logger.error(e)
@@ -84,7 +94,7 @@ class TwitterBot:
             logger.info(f"Scrapping Done, scraped {len(all_tweets)} tweets")
             return all_tweets
 
-    def save_all_tweet_to_json(self, filename="", path=""):
+    def save_all_tweet_to_json(self, filename="", path="", auto_approve: bool = False):
         all_tweets = self.get_all_tweets()
         if path.strip() and not os.path.exists(os.path.abspath(path)):
             base_path = os.path.abspath(path)
@@ -93,22 +103,49 @@ class TwitterBot:
                 os.path.expanduser("~"), "Downloads", "twitter-bot"
             )
             os.makedirs(base_path, exist_ok=True)
-        if (
-                filename
-                and filename.strip()
-                and os.path.exists(os.path.join(os.path.join(base_path, filename)))
-        ):
-            choice = input("File Exists, Do You want to override(y/N):")
-            if choice.strip() != "y" or choice.strip() != "Y":
-                name, ext = filename.split(".")
-                name += f"-{datetime.now()}"
-                file = ".".join([name, ext])
-            else:
-                file = filename
-        else:
+        file = filename
+        if not file or file.strip() == "":
             file = f"{self.username or self.query_search}-{datetime.now()}.json"
-        with open(os.path.join(base_path, file), "w") as f:
-            json.dump(all_tweets, f, default=lambda x: x.__dict__)
+        file_exist = os.path.exists(os.path.join(os.path.join(base_path, file)))
+
+        file_path = os.path.join(base_path, file)
+        is_override = False
+        if not auto_approve and file_exist:
+            option = input(
+                "File already exist. Do you want to Override(o) or Append(A)? (o/A):"
+            )
+            is_override = option.strip().lower() == "o"
+        if is_override:
+            with open(file_path, "w") as f:
+                logger.info(f"Writing {len(all_tweets)} to Path: {file_path}")
+                json.dump(all_tweets, f, default=lambda x: x.__dict__)
+        else:
+            mode = "r+"
+            file_path = os.path.join(base_path, filename)
+            if not os.path.isfile(file_path):
+                mode = "w+"
+            with open(file_path, mode) as f:
+                raw_data = f.read()
+                if raw_data:
+                    data: list = json.loads(raw_data)
+                else:
+                    data: list = list()
+                logger.info(f"Found {len(data)} Old Tweets")
+                if not self.fetch_new:
+                    data.extend([tweet.__dict__ for tweet in all_tweets])
+                else:
+                    data = [tweet.__dict__ for tweet in all_tweets] + data
+                temp_data = data[:]
+                data = []
+                timestamp_included = []
+                for tweet in temp_data:
+                    if tweet["timestamp"] not in timestamp_included:
+                        timestamp_included.append(tweet["timestamp"])
+                        data.append(tweet)
+                logger.info(f"Writing {len(data)} to Path: {file_path}")
+                f.truncate(0)
+                f.seek(0)
+                json.dump(data, f)
 
     def sleep(self):
         if self.__failure > 20:
@@ -117,12 +154,10 @@ class TwitterBot:
             raise exceptions.MaximumRetryException(
                 "Too many failure attempts to scrape tweets"
             )
-        if 10 <= self.__failure < 20:
-            wait_time = random.choice(20, 120)
-            self.__failure += 1
+        elif 10 <= self.__failure < 20:
+            wait_time = random.uniform(20, 120)
             logger.warning(f"Failure Occur, Waiting for {wait_time}")
         else:
-            wait_time = random.choice(5, 20)
-            self.__failure += 1
+            wait_time = random.uniform(5, 20)
             logger.warning(f"Failure Occur, Waiting for {wait_time}")
         time.sleep(wait_time)

@@ -40,6 +40,18 @@ def main():
         default=None,
         help="File Name to which tweets need to be saved in tweet-bot directory of Downloads directory of your home",
     )
+    parser.add_argument(
+        "--auto-approve",
+        default=False,
+        help="Auto approve any Inputs.",
+        action="store_true"
+    )
+    parser.add_argument(
+        "--fetch-new",
+        default=False,
+        help="Fetch only New Tweets",
+        action="store_true"
+    )
     args = parser.parse_args()
     if args.username or args.query:
         bot = TwitterBot(
@@ -48,8 +60,9 @@ def main():
             until=args.until,
             query_search=args.query,
             lang=args.lang,
+            fetch_new=args.fetch_new
         )
-        bot.save_all_tweet_to_json(filename=args.output)
+        bot.save_all_tweet_to_json(filename=args.output, auto_approve=args.auto_approve)
     else:
         logger.error("Either of the Option Required --username or --query")
 
